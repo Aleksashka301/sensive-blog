@@ -34,7 +34,11 @@ def get_likes_count(Post):
 
 
 def index(request):
-    most_popular_posts = [post for post in get_likes_count(Post)]  # TODO. Как это посчитать?
+    most_popular_posts = Post.objects\
+        .prefetch_related('tags', 'likes')\
+        .select_related('author')\
+        .annotate(likes_count=Count('likes'))\
+        .order_by('-likes_count')[:5]   # TODO. Как это посчитать?
     fresh_posts = Post.objects.order_by('published_at')
     most_fresh_posts = list(fresh_posts)[-5:]
     most_popular_tags = Tag.objects.annotate(posts_count=Count('posts')).order_by('-posts_count')[:5]
