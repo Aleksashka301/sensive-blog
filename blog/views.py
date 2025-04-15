@@ -51,7 +51,7 @@ def index(request):
     most_popular_posts = Post.objects\
         .prefetch_related('tags', 'likes')\
         .select_related('author')\
-        .annotate(likes_count=Count('likes', distinct=True))\
+        .annotate(likes_count=Count('likes'))\
         .order_by('-likes_count')[:5]   # TODO. Как это посчитать?
 
     fresh_posts = Post.objects\
@@ -61,7 +61,7 @@ def index(request):
         .order_by('-published_at')[:5]
 
     most_fresh_posts = list(fresh_posts)[-5:]
-    most_popular_tags = Tag.objects.annotate(posts_count=Count('posts')).order_by('-posts_count')[:5]
+    most_popular_tags = Tag.objects.popular()[:5]
 
     context = {
         'most_popular_posts': [
@@ -90,7 +90,6 @@ def post_detail(request, slug):
         })
 
     likes = post.likes.all()
-
     related_tags = post.tags.all()
 
     serialized_post = {
@@ -105,11 +104,12 @@ def post_detail(request, slug):
         'tags': [serialize_tag(tag) for tag in related_tags],
     }
 
-    all_tags = Tag.objects.all()
-    popular_tags = sorted(all_tags, key=get_related_posts_count)
-    most_popular_tags = popular_tags[-5:]
-
-    most_popular_posts = []  # TODO. Как это посчитать?
+    most_popular_tags = Tag.objects.popular()[:5]
+    most_popular_posts = Post.objects\
+        .prefetch_related('tags', 'likes')\
+        .select_related('author')\
+        .annotate(likes_count=Count('likes'))\
+        .order_by('-likes_count')[:5]  # TODO. Как это посчитать?
 
     context = {
         'post': serialized_post,
@@ -123,21 +123,24 @@ def post_detail(request, slug):
 
 def tag_filter(request, tag_title):
     tag = Tag.objects.get(title=tag_title)
+    most_popular_tags = Tag.objects.popular()[:5]
 
-    all_tags = Tag.objects.all()
-    popular_tags = sorted(all_tags, key=get_related_posts_count)
-    most_popular_tags = popular_tags[-5:]
+    most_popular_posts = Post.objects\
+        .prefetch_related('tags', 'likes')\
+        .select_related('author')\
+        .annotate(likes_count=Count('likes'))\
+        .order_by('-likes_count')[:5]  # TODO. Как это посчитать?
 
-    most_popular_posts = []  # TODO. Как это посчитать?
-
-    related_posts = tag.posts.all()[:20]
+    related_posts = tag.posts\
+        .prefetch_related('tags', 'likes')\
+        .select_related('author')[:20]
 
     context = {
         'tag': tag.title,
         'popular_tags': [serialize_tag(tag) for tag in most_popular_tags],
-        'posts': [serialize_post(post) for post in related_posts],
+        'posts': [serialize_post_optimized(post) for post in related_posts],
         'most_popular_posts': [
-            serialize_post(post) for post in most_popular_posts
+            serialize_post_optimized(post) for post in most_popular_posts
         ],
     }
     return render(request, 'posts-list.html', context)
