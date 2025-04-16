@@ -5,8 +5,33 @@ from django.contrib.auth.models import User
 
 
 class PostQuerySet(models.QuerySet):
-    def year(self, year):
-        return self.filter(published_at__year=year).order_by('published_at')
+    def popular(self):
+        return self.annotate(likes_count=Count('likes')).order_by('-likes_count')
+
+    def fetch_with_comments_count(self):
+        """
+            Добавляет к каждому посту поле `comments_count`, содержащее количество комментариев.
+
+            Этот метод выполняет дополнительный SQL-запрос, который подсчитывает количество
+            комментариев для каждого поста и вручную присваивает это значение атрибуту `comments_count`.
+
+            Преимущества:
+            - Можно использовать срезы.
+            - Можно использовать после `select_related` и `prefetch_related` без потери производительности.
+            - Не увеличивает время на обработку запроса
+        """
+        posts = list(self)
+        post_ids = [post.id for post in posts]
+
+        posts_with_comments = Post.objects.filter(id__in=post_ids)\
+            .annotate(comments_count=Count('comments'))
+
+        id_to_comments = {post.id: post.comments_count for post in posts_with_comments}
+
+        for post in posts:
+            post.comments_count = id_to_comments.get(post.id, 0)
+
+        return posts
 
 
 class TagQuerySet(models.QuerySet):
@@ -44,9 +69,6 @@ class Post(models.Model):
         'Tag',
         related_name='posts',
         verbose_name='Теги')
-
-    def year(self, year):
-        return self.filter(published_at__year=year).order_by('published_at')
 
     def __str__(self):
         return self.title
