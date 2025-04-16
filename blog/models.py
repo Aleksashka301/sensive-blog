@@ -36,7 +36,7 @@ class PostQuerySet(models.QuerySet):
 
 class TagQuerySet(models.QuerySet):
     def popular(self):
-        return self.annotate(posts_count=Count('posts')).order_by('-posts_count')
+        return self.annotate(posts_with_tag=Count('posts')).order_by('-posts_with_tag')
 
 
 class TagManager(models.Manager):
@@ -84,7 +84,7 @@ class Post(models.Model):
 
 class Tag(models.Model):
     title = models.CharField('Тег', max_length=20, unique=True)
-    objects = TagManager()
+    objects = TagQuerySet.as_manager()
 
     def __str__(self):
         return self.title
